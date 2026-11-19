@@ -12,8 +12,9 @@ edit `Local State`, and relaunch it with `--restore-last-session`.
 ## Install (Windows 11, Windows PowerShell 5.1, no admin)
 1. `powershell -ExecutionPolicy Bypass -File install.ps1` creates the signing key on first run, writes two host manifests, registers them under `HKCU`, and prints the extension ID.
    - Chrome uses `HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.local.hwaccel_toggle` (launcher `hwaccel_host.bat`).
-   - Brave uses its own key, `HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.local.hwaccel_toggle` (launcher `hwaccel_host_brave.bat`, which sets `HWACCEL_BROWSER=brave`).
+   - Brave uses its own key, `HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\com.local.hwaccel_toggle` (launcher `hwaccel_host_brave.bat`, which sets `HWACCEL_BROWSER=brave` as a fallback).
    - Both are always registered; the one for a browser you don't have is harmless.
+   - The helper identifies which browser called it from its parent process (`brave.exe` or `chrome.exe`), because Brave may read Chrome's registry key. `HWACCEL_BROWSER` is only a fallback when no browser is found in the ancestry; the final default is Chrome.
 2. Chrome: open `chrome://extensions`. Brave: open `brave://extensions`. Enable Developer mode, click **Load unpacked**, select the `extension` folder.
 3. Check the ID shown there matches the one printed by the installer (same ID in both browsers).
 4. Optional: set the shortcut at `chrome://extensions/shortcuts` or `brave://extensions/shortcuts` (suggested Alt+Shift+H).

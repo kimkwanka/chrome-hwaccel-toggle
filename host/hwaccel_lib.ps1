@@ -102,3 +102,27 @@ function Find-BrowserExe {
 	}
 	$null
 }
+# Walks the parent-process chain from $StartPid (host -> cmd -> browser) and returns 'brave'/'chrome'
+# for the first ancestor named brave.exe/chrome.exe, else $null. The registry key can't identify the
+# caller because Brave may read Chrome's NativeMessagingHosts key.
+function Get-CallingBrowser {
+	param([int]$StartPid = $PID, [int]$MaxLevels = 6)
+	$byId = @{}
+	Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name | ForEach-Object { $byId[[int]$_.ProcessId] = $_ }
+	$cur = $byId[$StartPid]
+	for ($i = 0; $i -lt $MaxLevels -and $cur; $i++) {
+		$cur = $byId[[int]$cur.ParentProcessId]
+		if ($cur -and $cur.Name -ieq 'brave.exe') { return 'brave' }
+		if ($cur -and $cur.Name -ieq 'chrome.exe') { return 'chrome' }
+	}
+	$null
+}
+
+# Ancestry first, then HWACCEL_BROWSER, then chrome. Returns @{ Config; Source }.
+function Resolve-Browser {
+	$name = Get-CallingBrowser
+	if ($name) { $source = 'parent process' }
+	elseif ($env:HWACCEL_BROWSER) { $name = $env:HWACCEL_BROWSER; $source = 'HWACCEL_BROWSER' }
+	else { $name = 'chrome'; $source = 'default' }
+	@{ Config = (Get-BrowserConfig $name); Source = $source }
+}

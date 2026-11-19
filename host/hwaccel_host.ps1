@@ -1,6 +1,6 @@
 # Chrome/Brave native messaging host: one message in, one reply out (4-byte LE length + UTF-8 JSON).
 # stdout carries only the framed reply. Env overrides for testing:
-#   HWACCEL_BROWSER      chrome (default) or brave (set by hwaccel_host_brave.bat)
+#   HWACCEL_BROWSER      chrome or brave; fallback when the parent process is not a browser
 #   HWACCEL_LOCAL_STATE  path to a sample Local State
 #   HWACCEL_DRYRUN=1     set/toggle reply ok but do not spawn the apply script
 #   HWACCEL_DRYRUN=apply spawn apply with -DryRun (edits the sample only; no Chrome wait/kill/launch)
@@ -54,7 +54,9 @@ try {
 	$msg = [Text.Encoding]::UTF8.GetString((Read-Exact $stdin $len)) | ConvertFrom-Json
 	Write-Log "request: $($msg.cmd)"
 
-	$cfg = Get-BrowserConfig $env:HWACCEL_BROWSER
+	$resolved = Resolve-Browser
+	$cfg = $resolved.Config
+	Write-Log "browser=$($cfg.Name) (from $($resolved.Source))"
 	$path = Get-LocalStatePath $cfg
 	$current = if (Test-Path -LiteralPath $path) { Get-HwAccelEnabledFromText ([IO.File]::ReadAllText($path)) } else { $true }
 
@@ -66,7 +68,7 @@ try {
 				$target = [bool]$msg.enabled
 			}
 			else { $target = -not $current }
-			if (-not (Test-Path -LiteralPath $path)) { throw "Local State not found: $path" }
+			if (-not (Test-Path -LiteralPath $path)) { throw "Local State not found for $($cfg.Display): $path" }
 			if ($env:HWACCEL_DRYRUN -ne '1') { Start-Apply -Enable $target -LocalStatePath $path -Browser $cfg.Name }
 			$reply = @{ ok = $true; target = $target }
 		}
