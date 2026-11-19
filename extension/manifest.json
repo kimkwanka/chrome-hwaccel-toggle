@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Hardware Acceleration Toggle",
+  "version": "1.0.0",
+  "description": "Toggle Chrome's hardware acceleration in one click (needs the local native helper).",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlKMu4VJDryRioavfrboWtFo2B0pzDvKCVinGcBSmZsEl5IeK07KaWoOth6aqTo+IFm/3oMSJzIk3ViFFmRhx/r8m3Z/XYt4EpfqGWonX38UhlNRRw4I3E84VvCsmF51d4CsHXNJXtGz70PfYKzA7c1KqsYYfDPSw6NTOWIjfwJuOOY2sxYurP8k/XvJCL6U9eGSHet7Tg0Lf6p2WTV3xbW49e07cQUl83N4Aj2Cw/9eb0kqcYbRGi0tiyh5XJLCoCXd1E1VBdGD4PJKDnn/pznKvmlVudjBJEXMSkcQW5aFgJOiBj6nu+g5lWnL4D+scthi2hGGBBx6tcwIb2s7sYQIDAQAB",
+  "permissions": ["nativeMessaging"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "Hardware acceleration",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "commands": {
+    "toggle-hwaccel": {
+      "suggested_key": { "default": "Alt+Shift+H" },
+      "description": "Toggle hardware acceleration and restart Chrome"
+    }
+  }
+}

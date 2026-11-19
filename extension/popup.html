@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Hardware acceleration</h1>
+  <div class="row"><span>Saved setting</span><strong id="saved">…</strong></div>
+  <div class="row"><span>Currently running</span><strong id="running">…</strong></div>
+  <div id="renderer" class="small"></div>
+  <button id="toggle" disabled>Checking…</button>
+  <p class="warn">All Chrome windows will close and then be restored.</p>
+  <p id="error" class="error" hidden></p>
+  <script src="popup.js"></script>
+</body>
+</html>
