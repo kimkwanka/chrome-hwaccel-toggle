@@ -11,11 +11,30 @@ function Write-Log {
 	catch { }
 }
 
-function Get-LocalStatePath {
-	if ($env:HWACCEL_LOCAL_STATE) { return $env:HWACCEL_LOCAL_STATE }
-	Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\Local State'
+# Per-browser settings. $Name: 'chrome' (default) or 'brave'.
+function Get-BrowserConfig {
+	param([string]$Name)
+	if (-not $Name) { $Name = 'chrome' }
+	switch ($Name.ToLower()) {
+		'chrome' { $vendor = 'Google\Chrome'; $proc = 'chrome'; $display = 'Chrome' }
+		'brave' { $vendor = 'BraveSoftware\Brave-Browser'; $proc = 'brave'; $display = 'Brave' }
+		default { throw "Unknown browser '$Name' (expected chrome or brave)" }
+	}
+	@{
+		Name         = $Name.ToLower()
+		Display      = $display
+		Process      = $proc
+		ExeName      = "$proc.exe"
+		LocalState   = Join-Path $env:LOCALAPPDATA "$vendor\User Data\Local State"
+		AppDir       = "$vendor\Application"
+	}
 }
 
+function Get-LocalStatePath {
+	param($Config = (Get-BrowserConfig $env:HWACCEL_BROWSER))
+	if ($env:HWACCEL_LOCAL_STATE) { return $env:HWACCEL_LOCAL_STATE }
+	$Config.LocalState
+}
 $script:ModeRx = '"hardware_acceleration_mode"\s*:\s*\{\s*"enabled"\s*:\s*(true|false)\s*\}'
 $script:PrevRx = '"hardware_acceleration_mode_previous"\s*:\s*(true|false)'
 
@@ -70,16 +89,16 @@ function Set-HwAccelInFile {
 	}
 }
 
-function Find-ChromeExe {
+function Find-BrowserExe {
+	param($Config)
 	foreach ($hive in 'HKCU', 'HKLM') {
-		$p = (Get-ItemProperty -Path "${hive}:\Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe" -ErrorAction SilentlyContinue).'(default)'
+		$p = (Get-ItemProperty -Path "${hive}:\Software\Microsoft\Windows\CurrentVersion\App Paths\$($Config.ExeName)" -ErrorAction SilentlyContinue).'(default)'
 		if ($p -and (Test-Path -LiteralPath $p)) { return $p }
 	}
-	$candidates = @(
-		(Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
-		(Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
-		(Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe')
-	)
-	foreach ($c in $candidates) { if ($c -and (Test-Path -LiteralPath $c)) { return $c } }
+	foreach ($base in $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA) {
+		if (-not $base) { continue }
+		$c = Join-Path $base (Join-Path $Config.AppDir $Config.ExeName)
+		if (Test-Path -LiteralPath $c) { return $c }
+	}
 	$null
 }

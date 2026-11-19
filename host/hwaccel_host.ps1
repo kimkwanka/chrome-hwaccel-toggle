@@ -1,5 +1,6 @@
-# Chrome native messaging host: one message in, one reply out (4-byte LE length + UTF-8 JSON).
+# Chrome/Brave native messaging host: one message in, one reply out (4-byte LE length + UTF-8 JSON).
 # stdout carries only the framed reply. Env overrides for testing:
+#   HWACCEL_BROWSER      chrome (default) or brave (set by hwaccel_host_brave.bat)
 #   HWACCEL_LOCAL_STATE  path to a sample Local State
 #   HWACCEL_DRYRUN=1     set/toggle reply ok but do not spawn the apply script
 #   HWACCEL_DRYRUN=apply spawn apply with -DryRun (edits the sample only; no Chrome wait/kill/launch)
@@ -28,10 +29,10 @@ function Write-Message {
 
 # Fully detached: created via WMI so it is not a child of the host (survives host/Chrome exit and job objects).
 function Start-Apply {
-	param([bool]$Enable, [string]$LocalStatePath)
+	param([bool]$Enable, [string]$LocalStatePath, [string]$Browser)
 	$ps = Join-Path $PSHOME 'powershell.exe'
 	$apply = Join-Path $PSScriptRoot 'hwaccel_apply.ps1'
-	$cmd = '"{0}" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{1}" -Enable {2}' -f $ps, $apply, $Enable.ToString().ToLower()
+	$cmd = '"{0}" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{1}" -Enable {2} -Browser {3}' -f $ps, $apply, $Enable.ToString().ToLower(), $Browser
 	if ($env:HWACCEL_LOCAL_STATE) { $cmd += ' -LocalStatePath "{0}"' -f $LocalStatePath }
 	if ($env:HWACCEL_DRYRUN -eq 'apply') { $cmd += ' -DryRun' }
 	try {
@@ -53,11 +54,12 @@ try {
 	$msg = [Text.Encoding]::UTF8.GetString((Read-Exact $stdin $len)) | ConvertFrom-Json
 	Write-Log "request: $($msg.cmd)"
 
-	$path = Get-LocalStatePath
+	$cfg = Get-BrowserConfig $env:HWACCEL_BROWSER
+	$path = Get-LocalStatePath $cfg
 	$current = if (Test-Path -LiteralPath $path) { Get-HwAccelEnabledFromText ([IO.File]::ReadAllText($path)) } else { $true }
 
 	switch ($msg.cmd) {
-		'get' { $reply = @{ ok = $true; enabled = $current } }
+		'get' { $reply = @{ ok = $true; enabled = $current; browser = $cfg.Name } }
 		{ $_ -in 'set', 'toggle' } {
 			if ($_ -eq 'set') {
 				if ($msg.enabled -isnot [bool]) { throw "'enabled' must be a boolean" }
@@ -65,7 +67,7 @@ try {
 			}
 			else { $target = -not $current }
 			if (-not (Test-Path -LiteralPath $path)) { throw "Local State not found: $path" }
-			if ($env:HWACCEL_DRYRUN -ne '1') { Start-Apply -Enable $target -LocalStatePath $path }
+			if ($env:HWACCEL_DRYRUN -ne '1') { Start-Apply -Enable $target -LocalStatePath $path -Browser $cfg.Name }
 			$reply = @{ ok = $true; target = $target }
 		}
 		default { throw "unknown cmd '$($msg.cmd)'" }

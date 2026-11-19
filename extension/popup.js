@@ -30,7 +30,7 @@ function render(enabled) {
   savedEnabled = enabled;
   $("saved").textContent = enabled ? "ON" : "OFF";
   const btn = $("toggle");
-  btn.textContent = enabled ? "Turn OFF & restart Chrome" : "Turn ON & restart Chrome";
+  btn.textContent = enabled ? "Turn OFF & restart browser" : "Turn ON & restart browser";
   btn.disabled = false;
 }
 
@@ -39,7 +39,10 @@ async function init() {
   $("running").textContent = r.accelerated ? "ON (GPU)" : "OFF (software)";
   $("renderer").textContent = r.renderer;
   const reply = await chrome.runtime.sendMessage({ type: "get" });
-  if (reply && reply.ok) render(reply.enabled);
+  if (reply && reply.ok) {
+    if (reply.browser) $("browser").textContent = "(" + reply.browser + ")";
+    render(reply.enabled);
+  }
   else {
     $("saved").textContent = "?";
     $("toggle").textContent = "Unavailable";
@@ -58,7 +61,7 @@ $("toggle").addEventListener("click", async () => {
     showError(hostError(reply || { error: "no response" }));
     $("toggle").disabled = false;
   } else {
-    $("toggle").textContent = "Restarting Chrome…";
+    $("toggle").textContent = "Restarting browser…";
   }
 });
 

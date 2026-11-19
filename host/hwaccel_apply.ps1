@@ -1,36 +1,38 @@
-# Waits for Chrome to exit, edits Local State, relaunches Chrome. Started detached by the host.
-# -Enable takes 'true' or 'false' (a string, because it arrives via -File).
+# Waits for the browser to exit, edits Local State, relaunches the browser. Started detached by the host.
+# -Enable takes 'true' or 'false' (a string, because it arrives via -File). -Browser: chrome (default) or brave.
 param(
 	[Parameter(Mandatory)][string]$Enable,
+	[string]$Browser = 'chrome',
 	[string]$LocalStatePath,
-	[switch]$DryRun,       # edit the file but don't wait for / kill / relaunch Chrome
+	[switch]$DryRun,       # edit the file but don't wait for / kill / relaunch the browser
 	[int]$WaitSeconds = 20,
 	[int]$GracefulSeconds = 10
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'hwaccel_lib.ps1')
 
-function Wait-ChromeExit {
-	param([int]$Seconds)
+function Wait-BrowserExit {
+	param([string]$ProcessName, [int]$Seconds)
 	$deadline = (Get-Date).AddSeconds($Seconds)
 	while ((Get-Date) -lt $deadline) {
-		if (-not (Get-Process -Name chrome -ErrorAction SilentlyContinue)) { return $true }
+		if (-not (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)) { return $true }
 		Start-Sleep -Milliseconds 300
 	}
-	-not (Get-Process -Name chrome -ErrorAction SilentlyContinue)
+	-not (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)
 }
 
 try {
+	$cfg = Get-BrowserConfig $Browser
 	$target = [Convert]::ToBoolean($Enable)
-	if (-not $LocalStatePath) { $LocalStatePath = Get-LocalStatePath }
-	Write-Log "apply start: enable=$target path=$LocalStatePath dryRun=$DryRun"
+	if (-not $LocalStatePath) { $LocalStatePath = $cfg.LocalState }
+	Write-Log "apply start: browser=$($cfg.Name) enable=$target path=$LocalStatePath dryRun=$DryRun"
 
 	if (-not $DryRun) {
-		if (-not (Wait-ChromeExit $WaitSeconds)) {
-			Write-Log 'Chrome still running; trying graceful taskkill'
-			& taskkill.exe /IM chrome.exe 2>&1 | Out-Null
-			if (-not (Wait-ChromeExit $GracefulSeconds)) {
-				Write-Log 'Chrome did not exit (background apps?). Aborting without editing.'
+		if (-not (Wait-BrowserExit $cfg.Process $WaitSeconds)) {
+			Write-Log "$($cfg.Display) still running; trying graceful taskkill"
+			& taskkill.exe /IM $cfg.ExeName 2>&1 | Out-Null
+			if (-not (Wait-BrowserExit $cfg.Process $GracefulSeconds)) {
+				Write-Log "$($cfg.Display) did not exit (background apps?). Aborting without editing."
 				exit 1
 			}
 		}
@@ -39,9 +41,9 @@ try {
 	Set-HwAccelInFile -Path $LocalStatePath -Enabled $target
 
 	if (-not $DryRun) {
-		$chrome = Find-ChromeExe
-		if ($chrome) { Start-Process -FilePath $chrome -ArgumentList '--restore-last-session'; Write-Log "relaunched $chrome" }
-		else { Write-Log 'chrome.exe not found; cannot relaunch' }
+		$exe = Find-BrowserExe $cfg
+		if ($exe) { Start-Process -FilePath $exe -ArgumentList '--restore-last-session'; Write-Log "relaunched $exe" }
+		else { Write-Log "$($cfg.ExeName) not found; cannot relaunch" }
 	}
 }
 catch {
