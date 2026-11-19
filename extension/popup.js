@@ -1,19 +1,6 @@
 const $ = (id) => document.getElementById(id);
 let savedEnabled = null;
 
-function detectRenderer() {
-  try {
-    const gl = document.createElement("canvas").getContext("webgl");
-    if (!gl) return { renderer: "WebGL unavailable", accelerated: false };
-    const ext = gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "unknown";
-    const software = /SwiftShader|Microsoft Basic Render/i.test(renderer);
-    return { renderer, accelerated: !software };
-  } catch (e) {
-    return { renderer: String(e), accelerated: false };
-  }
-}
-
 function showError(text) {
   $("error").textContent = text;
   $("error").hidden = false;
@@ -35,17 +22,20 @@ function render(enabled) {
 }
 
 async function init() {
-  const r = detectRenderer();
+  const probe = probeGpu(document.createElement("canvas"));
+  const r = probe || { renderer: "WebGL unavailable", accelerated: false };
   $("running").textContent = r.accelerated ? "ON (GPU)" : "OFF (software)";
   $("renderer").textContent = r.renderer;
   const reply = await chrome.runtime.sendMessage({ type: "get" });
   if (reply && reply.ok) {
     if (reply.browser) $("browser").textContent = "(" + reply.browser + ")";
     render(reply.enabled);
+    applyActionState(probe ? probe.accelerated : reply.enabled, reply.enabled);
   }
   else {
     $("saved").textContent = "?";
     $("toggle").textContent = "Unavailable";
+    if (probe) applyActionState(probe.accelerated, undefined);
     showError(hostError(reply || { error: "no response" }));
   }
 }
